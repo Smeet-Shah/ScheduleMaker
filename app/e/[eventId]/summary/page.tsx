@@ -215,9 +215,14 @@ export default function SummaryPage() {
                   const baseColor =
                     intensity === 0
                       ? "bg-zinc-50 text-zinc-400 border-zinc-200"
-                      : intensity > 0.66
-                        ? "bg-emerald-600 text-white border-emerald-700"
-                        : "bg-emerald-200 text-emerald-900 border-emerald-300";
+                      : totalCount === maxCount
+                        ? // Everyone who responded is available
+                          "bg-emerald-600 text-white border-emerald-700"
+                        : intensity >= 0.5
+                          ? // Most people available
+                            "bg-emerald-300 text-emerald-900 border-emerald-400"
+                          : // Only a few people available
+                            "bg-emerald-100 text-emerald-900 border-emerald-200";
 
                   if (!cell.inRange) {
                     return (
