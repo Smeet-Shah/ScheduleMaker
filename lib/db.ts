@@ -1,8 +1,12 @@
-import { sql } from '@vercel/postgres';
+import { sql } from "@vercel/postgres";
 
 export { sql };
 
-export async function ensureSchema() {
+// Ensure tables exist in the connected Postgres/Neon database.
+async function ensureSchema() {
+  // Required for gen_random_uuid() on Neon/Postgres
+  await sql`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS events (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -39,4 +43,9 @@ export async function ensureSchema() {
     );
   `;
 }
+
+// Kick off schema creation once per serverless process.
+// This runs on first import in each Vercel function instance.
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
+ensureSchema();
 
