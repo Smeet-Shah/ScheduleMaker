@@ -31,6 +31,10 @@ export default function SummaryPage() {
   const [eventData, setEventData] = useState<EventData | null>(null);
   const [summary, setSummary] = useState<SummaryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDateLabel, setSelectedDateLabel] = useState<string | null>(
+    null,
+  );
+  const [selectedNames, setSelectedNames] = useState<string[]>([]);
 
   const calendarMonths = useMemo(() => {
     if (!eventData) return [];
@@ -61,7 +65,11 @@ export default function SummaryPage() {
       for (let w = 0; w < 6; w++) {
         const week: { date: Date; inRange: boolean }[] = [];
         for (let d = 0; d < 7; d++) {
-          const inRange = current >= start && current <= end;
+          const inRange =
+            current >= start &&
+            current <= end &&
+            current.getMonth() === monthStart.getMonth() &&
+            current.getFullYear() === monthStart.getFullYear();
           week.push({ date: current, inRange });
           current = addDays(current, 1);
         }
@@ -169,9 +177,9 @@ export default function SummaryPage() {
                   <span className="inline-flex h-3 w-3 rounded-sm border border-zinc-300 bg-zinc-50" />{" "}
                   No one available
                   <span className="inline-flex h-3 w-3 rounded-sm border border-emerald-400 bg-emerald-200 ml-3" />{" "}
-                  Some available
+                  Some people
                   <span className="inline-flex h-3 w-3 rounded-sm border border-emerald-700 bg-emerald-600 ml-3" />{" "}
-                  Everyone / most available
+                  Most / everyone
                 </div>
               </div>
               <div className="grid grid-cols-7 text-[11px] text-zinc-500 mb-1">
@@ -202,9 +210,6 @@ export default function SummaryPage() {
                     if (info) totalCount = Math.max(totalCount, info.count);
                   }
 
-                  const everyoneAvailable =
-                    maxCount > 0 && totalCount === maxCount && totalCount > 0;
-
                   const intensity =
                     maxCount > 0 ? totalCount / maxCount : 0;
                   const baseColor =
@@ -223,17 +228,34 @@ export default function SummaryPage() {
                     );
                   }
 
+                  const dateLabel = cell.date.toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  });
+
+                  const namesForDay = new Set<string>();
+                  for (const slot of slotsForDay) {
+                    const isoStart = new Date(slot.start).toISOString();
+                    const info = countsBySlotStart.get(isoStart);
+                    if (info) {
+                      info.names.forEach((n) => namesForDay.add(n));
+                    }
+                  }
+
                   return (
                     <div
                       key={dateKey}
-                      className={`h-12 rounded-md border text-xs flex flex-col items-center justify-center ${baseColor} ${
-                        everyoneAvailable ? "ring-2 ring-sky-500" : ""
-                      }`}
+                      className={`h-12 rounded-md border text-xs flex flex-col items-center justify-center cursor-pointer ${baseColor}`}
                       title={
                         totalCount === 0
                           ? "No one available"
                           : `${totalCount} available`
                       }
+                      onClick={() => {
+                        setSelectedDateLabel(dateLabel);
+                        setSelectedNames(Array.from(namesForDay));
+                      }}
                     >
                       <span className="text-sm font-medium">
                         {format(cell.date, "d")}
@@ -245,6 +267,30 @@ export default function SummaryPage() {
             </div>
           ))}
         </div>
+
+        {selectedDateLabel && (
+          <div className="mt-4 border-t border-zinc-200 pt-4">
+            <h2 className="text-sm font-semibold text-zinc-800 mb-2">
+              Who&apos;s available on {selectedDateLabel}?
+            </h2>
+            {selectedNames.length === 0 ? (
+              <p className="text-xs text-zinc-500">
+                No one has selected this date yet.
+              </p>
+            ) : (
+              <ul className="flex flex-wrap gap-2 text-xs text-zinc-800">
+                {selectedNames.map((name) => (
+                  <li
+                    key={name}
+                    className="px-2 py-1 rounded-full border border-zinc-200 bg-zinc-50"
+                  >
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );

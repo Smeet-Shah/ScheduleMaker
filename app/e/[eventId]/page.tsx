@@ -62,7 +62,11 @@ export default function EventPage() {
       for (let w = 0; w < 6; w++) {
         const week: { date: Date; inRange: boolean; hasSlot: boolean }[] = [];
         for (let d = 0; d < 7; d++) {
-          const inRange = current >= start && current <= end;
+          const inRange =
+            current >= start &&
+            current <= end &&
+            current.getMonth() === monthStart.getMonth() &&
+            current.getFullYear() === monthStart.getFullYear();
           const hasSlot = data.slots.some((slot) =>
             isSameDay(new Date(slot.start), current),
           );
@@ -102,6 +106,37 @@ export default function EventPage() {
 
     fetchEvent();
   }, [eventId]);
+
+  async function loadExisting() {
+    if (!name.trim()) {
+      setMessage("Enter your name first, then load your saved availability.");
+      return;
+    }
+    if (!data) return;
+    try {
+      setMessage(null);
+      const res = await fetch(
+        `/api/events/${eventId}/availability?name=${encodeURIComponent(name)}`,
+      );
+      if (!res.ok) {
+        if (res.status === 404) {
+          setMessage("No saved availability found for that name yet.");
+          return;
+        }
+        throw new Error("Failed to load");
+      }
+      const json = await res.json();
+      const next = new Set<string>();
+      (json.slots as Slot[]).forEach((slot) => {
+        next.add(`${slot.start}-${slot.end}`);
+      });
+      setSelected(next);
+      setMessage("Loaded your previous availability. You can adjust and save.");
+    } catch (e) {
+      console.error(e);
+      setMessage("Could not load your existing availability.");
+    }
+  }
 
   const groupedSlots = useMemo(() => {
     if (!data) return {};
@@ -206,6 +241,13 @@ export default function EventPage() {
                   placeholder="e.g. Alex"
                 />
               </label>
+              <button
+                type="button"
+                onClick={loadExisting}
+                className="mt-1 md:mt-6 inline-flex items-center justify-center px-3 h-9 rounded-md border border-zinc-300 text-xs font-medium text-zinc-800 hover:bg-zinc-50"
+              >
+                Load my saved availability
+              </button>
               <label className="flex flex-col text-sm font-medium text-zinc-800 gap-1">
                 Your time zone
                 <select

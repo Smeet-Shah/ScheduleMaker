@@ -7,6 +7,45 @@ type Body = {
   slots: { start: string; end: string }[];
 };
 
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ eventId: string }> },
+) {
+  const { eventId } = await context.params;
+  const { searchParams } = new URL(req.url);
+  const name = searchParams.get("name");
+
+  if (!name) {
+    return NextResponse.json(
+      { error: "Missing name parameter" },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const { rows } =
+      await sql`SELECT a.slot_start, a.slot_end
+                FROM participants p
+                JOIN availabilities a ON a.participant_id = p.id
+                WHERE p.event_id = ${eventId}::uuid
+                  AND p.name = ${name}
+                ORDER BY a.slot_start;`;
+
+    const slots = rows.map((row) => ({
+      start: row.slot_start,
+      end: row.slot_end,
+    }));
+
+    return NextResponse.json({ slots });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: "Failed to load availability" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(
   req: NextRequest,
   context: { params: Promise<{ eventId: string }> },

@@ -101,6 +101,25 @@ export default function AdminPage() {
     }
   }
 
+  async function onDelete(eventId: string) {
+    if (
+      !window.confirm(
+        "Delete this event and all of its data? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    const res = await fetch(`/api/events/${eventId}/delete`, {
+      method: "POST",
+    });
+    if (res.ok) {
+      setMessage("Event deleted.");
+      loadEvents();
+    } else {
+      setMessage("Failed to delete event.");
+    }
+  }
+
   if (!authed) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-zinc-50 px-4">
@@ -303,13 +322,22 @@ export default function AdminPage() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onReset(event.id)}
-                    className="self-start inline-flex items-center justify-center h-8 px-3 rounded-md border border-red-200 text-xs font-medium text-red-700 hover:bg-red-50"
-                  >
-                    Reset responses
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onReset(event.id)}
+                      className="self-start inline-flex items-center justify-center h-8 px-3 rounded-md border border-amber-200 text-xs font-medium text-amber-700 hover:bg-amber-50"
+                    >
+                      Reset responses
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(event.id)}
+                      className="self-start inline-flex items-center justify-center h-8 px-3 rounded-md border border-red-200 text-xs font-medium text-red-700 hover:bg-red-50"
+                    >
+                      Delete event
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
