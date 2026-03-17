@@ -38,6 +38,7 @@ export default function EventPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
 
   // For day-only events, build a calendar view data structure
   const calendarMonths = useMemo(() => {
@@ -131,6 +132,7 @@ export default function EventPage() {
         next.add(`${slot.start}-${slot.end}`);
       });
       setSelected(next);
+      setDirty(false);
       setMessage("Loaded your previous availability. You can adjust and save.");
     } catch (e) {
       console.error(e);
@@ -163,6 +165,7 @@ export default function EventPage() {
       } else {
         next.add(key);
       }
+      setDirty(true);
       return next;
     });
   }
@@ -173,6 +176,10 @@ export default function EventPage() {
       return;
     }
     if (!data) return;
+    if (!dirty) {
+      setMessage("No changes to save yet.");
+      return;
+    }
     setSaving(true);
     setMessage(null);
     try {
@@ -187,6 +194,7 @@ export default function EventPage() {
       if (!res.ok) {
         throw new Error("Failed to save");
       }
+      setDirty(false);
       setMessage("Your availability has been saved.");
     } catch (e) {
       console.error(e);
@@ -386,10 +394,14 @@ export default function EventPage() {
             <button
               type="button"
               onClick={onSave}
-              disabled={saving}
-              className="w-full h-10 rounded-md bg-zinc-900 text-zinc-50 text-sm font-medium hover:bg-zinc-800 disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={saving || !dirty}
+              className="w-full h-10 rounded-md bg-zinc-900 text-zinc-50 text-sm font-medium hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {saving ? "Saving..." : "Save my availability"}
+              {saving
+                ? "Saving..."
+                : dirty
+                  ? "Save my availability"
+                  : "Saved"}
             </button>
             {message && (
               <p className="text-sm text-zinc-700 bg-zinc-50 border border-zinc-200 rounded-md px-3 py-2">

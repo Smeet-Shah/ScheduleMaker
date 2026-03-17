@@ -155,7 +155,7 @@ export default function SummaryPage() {
 
   return (
     <main className="min-h-screen bg-zinc-50 flex justify-center px-4 py-10">
-      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-sm border border-zinc-100 p-6 md:p-10 space-y-6">
+      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-md border border-zinc-100 p-6 md:p-10 space-y-6">
         <header className="space-y-2">
           <h1 className="text-2xl md:text-3xl font-semibold text-zinc-900">
             Best availability for {eventData.event.title}
@@ -269,26 +269,40 @@ export default function SummaryPage() {
         </div>
 
         {selectedDateLabel && (
-          <div className="mt-4 border-t border-zinc-200 pt-4">
-            <h2 className="text-sm font-semibold text-zinc-800 mb-2">
-              Who&apos;s available on {selectedDateLabel}?
-            </h2>
-            {selectedNames.length === 0 ? (
-              <p className="text-xs text-zinc-500">
-                No one has selected this date yet.
-              </p>
-            ) : (
-              <ul className="flex flex-wrap gap-2 text-xs text-zinc-800">
-                {selectedNames.map((name) => (
-                  <li
-                    key={name}
-                    className="px-2 py-1 rounded-full border border-zinc-200 bg-zinc-50"
-                  >
-                    {name}
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+            <div className="w-full max-w-sm rounded-2xl bg-white shadow-lg border border-zinc-200 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-zinc-900">
+                  Who&apos;s available on {selectedDateLabel}?
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDateLabel(null);
+                    setSelectedNames([]);
+                  }}
+                  className="text-xs text-zinc-500 hover:text-zinc-800"
+                >
+                  Close
+                </button>
+              </div>
+              {selectedNames.length === 0 ? (
+                <p className="text-xs text-zinc-500">
+                  No one has selected this date yet.
+                </p>
+              ) : (
+                <ul className="flex flex-wrap gap-2 text-xs text-zinc-800 max-h-40 overflow-auto">
+                  {selectedNames.map((name) => (
+                    <li
+                      key={name}
+                      className="px-2 py-1 rounded-full border border-zinc-200 bg-zinc-50"
+                    >
+                      {name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
       </div>
