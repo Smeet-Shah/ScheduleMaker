@@ -18,6 +18,8 @@ type EventData = {
   event: { id: string; title: string; description: string | null };
   config: {
     dayOnly: boolean;
+    startDate: string;
+    endDate: string;
   };
   slots: Slot[];
 };
