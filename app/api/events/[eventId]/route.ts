@@ -1,12 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { generateSlotsForEvent } from "@/lib/slots";
 
 export async function GET(
-  _req: Request,
-  { params }: { params: { eventId: string } },
+  _req: NextRequest,
+  context: { params: Promise<{ eventId: string }> },
 ) {
-  const { eventId } = params;
+  const { eventId } = await context.params;
 
   const { rows } =
     await sql`SELECT id, title, description, host_email, start_date, end_date, day_start_time, day_end_time, slot_duration_minutes

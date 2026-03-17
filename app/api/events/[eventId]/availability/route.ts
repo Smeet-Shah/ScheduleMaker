@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
 type Body = {
@@ -8,10 +8,10 @@ type Body = {
 };
 
 export async function POST(
-  req: Request,
-  { params }: { params: { eventId: string } },
+  req: NextRequest,
+  context: { params: Promise<{ eventId: string }> },
 ) {
-  const { eventId } = params;
+  const { eventId } = await context.params;
   const body = (await req.json()) as Body;
 
   if (!body.name || !body.timezone || !Array.isArray(body.slots)) {
@@ -21,30 +21,25 @@ export async function POST(
     );
   }
 
-  const client = await sql.begin();
-
   try {
     const participantResult =
-      await client`INSERT INTO participants (event_id, name, timezone)
-                   VALUES (${eventId}::uuid, ${body.name}, ${body.timezone})
-                   ON CONFLICT (event_id, name)
-                   DO UPDATE SET timezone = EXCLUDED.timezone
-                   RETURNING id;`;
+      await sql`INSERT INTO participants (event_id, name, timezone)
+                VALUES (${eventId}::uuid, ${body.name}, ${body.timezone})
+                ON CONFLICT (event_id, name)
+                DO UPDATE SET timezone = EXCLUDED.timezone
+                RETURNING id;`;
 
     const participantId = participantResult.rows[0].id;
 
-    await client`DELETE FROM availabilities WHERE event_id = ${eventId}::uuid AND participant_id = ${participantId}::uuid;`;
+    await sql`DELETE FROM availabilities WHERE event_id = ${eventId}::uuid AND participant_id = ${participantId}::uuid;`;
 
     for (const slot of body.slots) {
-      await client`INSERT INTO availabilities (event_id, participant_id, slot_start, slot_end)
-                   VALUES (${eventId}::uuid, ${participantId}::uuid, ${slot.start}, ${slot.end});`;
+      await sql`INSERT INTO availabilities (event_id, participant_id, slot_start, slot_end)
+                VALUES (${eventId}::uuid, ${participantId}::uuid, ${slot.start}, ${slot.end});`;
     }
-
-    await client.commit();
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    await client.rollback();
     console.error(error);
     return NextResponse.json(
       { error: "Failed to save availability" },

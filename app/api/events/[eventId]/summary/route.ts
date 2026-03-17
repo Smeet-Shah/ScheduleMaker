@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
 export async function GET(
-  _req: Request,
-  { params }: { params: { eventId: string } },
+  _req: NextRequest,
+  context: { params: Promise<{ eventId: string }> },
 ) {
-  const { eventId } = params;
+  const { eventId } = await context.params;
 
   const { rows } =
     await sql`SELECT slot_start, COUNT(DISTINCT participant_id) AS count
