@@ -18,7 +18,8 @@ async function ensureSchema() {
       day_start_time TIME NOT NULL,
       day_end_time TIME NOT NULL,
       slot_duration_minutes INTEGER NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      day_only BOOLEAN NOT NULL DEFAULT FALSE
     );
   `;
 
@@ -42,6 +43,9 @@ async function ensureSchema() {
       UNIQUE (event_id, participant_id, slot_start)
     );
   `;
+
+  // Backfill day_only column if events table already existed without it.
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS day_only BOOLEAN NOT NULL DEFAULT FALSE;`;
 }
 
 // Kick off schema creation once per serverless process.

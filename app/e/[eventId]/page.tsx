@@ -7,6 +7,11 @@ type Slot = { start: string; end: string };
 
 type EventResponse = {
   event: { id: string; title: string; description: string | null };
+  config: {
+    dayOnly: boolean;
+    startDate: string;
+    endDate: string;
+  };
   slots: Slot[];
 };
 
@@ -131,7 +136,9 @@ export default function EventPage() {
             <p className="text-zinc-600">{data.event.description}</p>
           )}
           <p className="text-sm text-zinc-500">
-            Click on the times you&apos;re available, then save.
+            {data.config.dayOnly
+              ? "Step 1: Enter your name and time zone. Step 2: Click every day you are free."
+              : "Step 1: Enter your name and time zone. Step 2: Click all of the times you’re available."}
           </p>
         </header>
 
@@ -174,30 +181,39 @@ export default function EventPage() {
                       {slots.map((slot) => {
                         const key = `${slot.start}-${slot.end}`;
                         const d = new Date(slot.start);
-                        const label = d.toLocaleTimeString(undefined, {
-                          hour: "numeric",
-                          minute: "2-digit",
-                          timeZone: timezone,
-                        });
                         const isSelected = selected.has(key);
+                        const label = data.config.dayOnly
+                          ? d.toLocaleDateString(undefined, {
+                              weekday: "short",
+                            })
+                          : d.toLocaleTimeString(undefined, {
+                              hour: "numeric",
+                              minute: "2-digit",
+                              timeZone: timezone,
+                            });
+                        const title = data.config.dayOnly
+                          ? d.toLocaleDateString(undefined, {
+                              weekday: "long",
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : new Date(slot.start).toLocaleString(undefined, {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                              timeZone: timezone,
+                            });
                         return (
                           <button
                             key={key}
                             type="button"
                             onClick={() => toggleSlot(key)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                            className={`px-3 py-2 rounded-full text-xs font-medium border transition-colors ${
                               isSelected
                                 ? "bg-emerald-500 text-white border-emerald-500"
                                 : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
                             }`}
-                            title={new Date(slot.start).toLocaleString(
-                              undefined,
-                              {
-                                dateStyle: "medium",
-                                timeStyle: "short",
-                                timeZone: timezone,
-                              },
-                            )}
+                            title={title}
                           >
                             {label}
                           </button>
@@ -228,6 +244,17 @@ export default function EventPage() {
               Your name and selected times are stored so the host can see which
               slots work best for everyone. You can come back and resave with
               the same name to update.
+            </p>
+            <p className="text-xs text-zinc-500">
+              Want to see the whole group&apos;s availability?{" "}
+              <a
+                href={`/e/${eventId}/summary`}
+                className="underline"
+                target="_blank"
+              >
+                Open the summary view
+              </a>
+              .
             </p>
           </aside>
         </section>

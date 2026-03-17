@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { generateSlotsForEvent } from "@/lib/slots";
+import {
+  generateDaySlotsForEvent,
+  generateTimeSlotsForEvent,
+} from "@/lib/slots";
 
 export async function GET(
   _req: NextRequest,
@@ -9,7 +12,7 @@ export async function GET(
   const { eventId } = await context.params;
 
   const { rows } =
-    await sql`SELECT id, title, description, host_email, start_date, end_date, day_start_time, day_end_time, slot_duration_minutes
+    await sql`SELECT id, title, description, host_email, start_date, end_date, day_start_time, day_end_time, slot_duration_minutes, day_only
               FROM events WHERE id = ${eventId}::uuid;`;
 
   if (rows.length === 0) {
@@ -20,21 +23,33 @@ export async function GET(
 
   const startDate = new Date(event.start_date);
   const endDate = new Date(event.end_date);
-  const dayStartParts = String(event.day_start_time).split(":").map(Number);
-  const dayEndParts = String(event.day_end_time).split(":").map(Number);
 
-  const slots = generateSlotsForEvent({
-    startDate,
-    endDate,
-    dayStartHour: dayStartParts[0],
-    dayStartMinute: dayStartParts[1],
-    dayEndHour: dayEndParts[0],
-    dayEndMinute: dayEndParts[1],
-    slotDurationMinutes: event.slot_duration_minutes,
-  }).map((slot) => ({
-    start: slot.start.toISOString(),
-    end: slot.end.toISOString(),
-  }));
+  const slots = event.day_only
+    ? generateDaySlotsForEvent({
+        startDate,
+        endDate,
+      }).map((slot) => ({
+        start: slot.start.toISOString(),
+        end: slot.end.toISOString(),
+      }))
+    : (() => {
+        const dayStartParts = String(event.day_start_time)
+          .split(":")
+          .map(Number);
+        const dayEndParts = String(event.day_end_time).split(":").map(Number);
+        return generateTimeSlotsForEvent({
+          startDate,
+          endDate,
+          dayStartHour: dayStartParts[0],
+          dayStartMinute: dayStartParts[1],
+          dayEndHour: dayEndParts[0],
+          dayEndMinute: dayEndParts[1],
+          slotDurationMinutes: event.slot_duration_minutes,
+        }).map((slot) => ({
+          start: slot.start.toISOString(),
+          end: slot.end.toISOString(),
+        }));
+      })();
 
   return NextResponse.json({
     event: {
@@ -48,6 +63,7 @@ export async function GET(
       dayStartTime: event.day_start_time,
       dayEndTime: event.day_end_time,
       slotDurationMinutes: event.slot_duration_minutes,
+      dayOnly: event.day_only,
     },
     slots,
   });

@@ -3,11 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
-type SummaryItem = { slotStart: string; count: number };
+type SummaryItem = { slotStart: string; count: number; names: string[] };
 type Slot = { start: string; end: string };
 
 type EventData = {
   event: { id: string; title: string; description: string | null };
+  config: {
+    dayOnly: boolean;
+  };
   slots: Slot[];
 };
 
@@ -38,9 +41,12 @@ export default function SummaryPage() {
   }, [eventId]);
 
   const countsBySlotStart = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { count: number; names: string[] }>();
     for (const item of summary) {
-      map.set(new Date(item.slotStart).toISOString(), item.count);
+      map.set(new Date(item.slotStart).toISOString(), {
+        count: item.count,
+        names: item.names,
+      });
     }
     return map;
   }, [summary]);
@@ -87,10 +93,11 @@ export default function SummaryPage() {
       <div className="w-full max-w-5xl bg-white rounded-2xl shadow-sm border border-zinc-100 p-6 md:p-10 space-y-6">
         <header className="space-y-2">
           <h1 className="text-2xl md:text-3xl font-semibold text-zinc-900">
-            Best times for {eventData.event.title}
+            Best availability for {eventData.event.title}
           </h1>
           <p className="text-sm text-zinc-600">
-            Darker green slots have more people available.
+            Each chip shows how many people are available. Darker green means
+            more people.
           </p>
         </header>
 
@@ -104,7 +111,11 @@ export default function SummaryPage() {
                 <div className="flex flex-wrap gap-2">
                   {slots.map((slot) => {
                     const isoStart = new Date(slot.start).toISOString();
-                    const count = countsBySlotStart.get(isoStart) ?? 0;
+                    const info = countsBySlotStart.get(isoStart) ?? {
+                      count: 0,
+                      names: [],
+                    };
+                    const count = info.count;
                     const intensity =
                       maxCount > 0 ? count / maxCount : 0;
                     const bg =
@@ -116,19 +127,24 @@ export default function SummaryPage() {
                             ? "bg-emerald-400 text-white"
                             : "bg-emerald-200 text-emerald-900";
 
-                    const label = new Date(slot.start).toLocaleTimeString(
-                      undefined,
-                      {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      },
-                    );
+                    const label = eventData.config.dayOnly
+                      ? new Date(slot.start).toLocaleDateString(undefined, {
+                          weekday: "short",
+                        })
+                      : new Date(slot.start).toLocaleTimeString(undefined, {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        });
+
+                    const title = info.names.length
+                      ? `${count} available: ${info.names.join(", ")}`
+                      : `${count} available`;
 
                     return (
                       <div
                         key={isoStart}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium border border-transparent ${bg}`}
-                        title={`${count} available`}
+                        title={title}
                       >
                         {label}
                         <span className="ml-2 text-[10px] opacity-80">

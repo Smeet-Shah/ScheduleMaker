@@ -8,15 +8,19 @@ export async function GET(
   const { eventId } = await context.params;
 
   const { rows } =
-    await sql`SELECT slot_start, COUNT(DISTINCT participant_id) AS count
-              FROM availabilities
-              WHERE event_id = ${eventId}::uuid
-              GROUP BY slot_start
-              ORDER BY slot_start;`;
+    await sql`SELECT a.slot_start,
+                     COUNT(DISTINCT a.participant_id) AS count,
+                     ARRAY_AGG(DISTINCT p.name) AS names
+              FROM availabilities a
+              JOIN participants p ON p.id = a.participant_id
+              WHERE a.event_id = ${eventId}::uuid
+              GROUP BY a.slot_start
+              ORDER BY a.slot_start;`;
 
   const summary = rows.map((row) => ({
     slotStart: row.slot_start,
     count: Number(row.count),
+    names: row.names ?? [],
   }));
 
   return NextResponse.json({ summary });
