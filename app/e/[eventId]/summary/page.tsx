@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import {
+  addDays,
+  endOfMonth,
+  format,
+  isSameDay,
+  startOfMonth,
+  startOfWeek,
+} from "date-fns";
 
 type SummaryItem = { slotStart: string; count: number; names: string[] };
 type Slot = { start: string; end: string };
@@ -21,6 +29,53 @@ export default function SummaryPage() {
   const [eventData, setEventData] = useState<EventData | null>(null);
   const [summary, setSummary] = useState<SummaryItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const calendarMonths = useMemo(() => {
+    if (!eventData) return [];
+    const start = new Date(
+      eventData.config.dayOnly
+        ? eventData.config.startDate
+        : eventData.slots[0]?.start ?? new Date(),
+    );
+    const end = new Date(
+      eventData.config.dayOnly
+        ? eventData.config.endDate
+        : eventData.slots[eventData.slots.length - 1]?.start ?? new Date(),
+    );
+
+    const months: {
+      monthLabel: string;
+      weeks: { date: Date; inRange: boolean }[][];
+    }[] = [];
+
+    let monthCursor = startOfMonth(start);
+    while (monthCursor <= end) {
+      const monthStart = startOfMonth(monthCursor);
+      const monthEnd = endOfMonth(monthCursor);
+      const firstDay = startOfWeek(monthStart, { weekStartsOn: 0 });
+
+      const weeks: { date: Date; inRange: boolean }[][] = [];
+      let current = firstDay;
+      for (let w = 0; w < 6; w++) {
+        const week: { date: Date; inRange: boolean }[] = [];
+        for (let d = 0; d < 7; d++) {
+          const inRange = current >= start && current <= end;
+          week.push({ date: current, inRange });
+          current = addDays(current, 1);
+        }
+        weeks.push(week);
+        if (current > monthEnd && current > end) break;
+      }
+
+      months.push({
+        monthLabel: format(monthStart, "MMMM yyyy"),
+        weeks,
+      });
+      monthCursor = addDays(monthEnd, 1);
+    }
+
+    return months;
+  }, [eventData]);
 
   useEffect(() => {
     async function load() {
@@ -101,62 +156,92 @@ export default function SummaryPage() {
           </p>
         </header>
 
-        <div className="overflow-x-auto rounded-xl border border-zinc-200">
-          <div className="min-w-[640px] divide-y divide-zinc-100">
-            {Object.entries(grouped).map(([dateLabel, slots]) => (
-              <div key={dateLabel} className="px-4 py-3 space-y-2">
-                <div className="text-sm font-medium text-zinc-800">
-                  {dateLabel}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {slots.map((slot) => {
-                    const isoStart = new Date(slot.start).toISOString();
-                    const info = countsBySlotStart.get(isoStart) ?? {
-                      count: 0,
-                      names: [],
-                    };
-                    const count = info.count;
-                    const intensity =
-                      maxCount > 0 ? count / maxCount : 0;
-                    const bg =
-                      intensity === 0
-                        ? "bg-zinc-100 text-zinc-500"
-                        : intensity > 0.66
-                          ? "bg-emerald-600 text-white"
-                          : intensity > 0.33
-                            ? "bg-emerald-400 text-white"
-                            : "bg-emerald-200 text-emerald-900";
-
-                    const label = eventData.config.dayOnly
-                      ? new Date(slot.start).toLocaleDateString(undefined, {
-                          weekday: "short",
-                        })
-                      : new Date(slot.start).toLocaleTimeString(undefined, {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        });
-
-                    const title = info.names.length
-                      ? `${count} available: ${info.names.join(", ")}`
-                      : `${count} available`;
-
-                    return (
-                      <div
-                        key={isoStart}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border border-transparent ${bg}`}
-                        title={title}
-                      >
-                        {label}
-                        <span className="ml-2 text-[10px] opacity-80">
-                          {count}
-                        </span>
-                      </div>
-                    );
-                  })}
+        <div className="space-y-6">
+          {calendarMonths.map((month) => (
+            <div key={month.monthLabel} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-zinc-800">
+                  {month.monthLabel}
+                </h2>
+                <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                  <span className="inline-flex h-3 w-3 rounded-sm border border-zinc-300 bg-zinc-50" />{" "}
+                  No one available
+                  <span className="inline-flex h-3 w-3 rounded-sm border border-emerald-400 bg-emerald-200 ml-3" />{" "}
+                  Some available
+                  <span className="inline-flex h-3 w-3 rounded-sm border border-emerald-700 bg-emerald-600 ml-3" />{" "}
+                  Everyone / most available
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-7 text-[11px] text-zinc-500 mb-1">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                  (day) => (
+                    <div key={day} className="text-center">
+                      {day}
+                    </div>
+                  ),
+                )}
+              </div>
+              <div className="grid grid-cols-7 gap-1 text-xs">
+                {month.weeks.flat().map((cell) => {
+                  const dateKey = format(cell.date, "yyyy-MM-dd");
+                  const slotsForDay =
+                    grouped[
+                      cell.date.toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    ] ?? [];
+
+                  let totalCount = 0;
+                  for (const slot of slotsForDay) {
+                    const isoStart = new Date(slot.start).toISOString();
+                    const info = countsBySlotStart.get(isoStart);
+                    if (info) totalCount = Math.max(totalCount, info.count);
+                  }
+
+                  const everyoneAvailable =
+                    maxCount > 0 && totalCount === maxCount && totalCount > 0;
+
+                  const intensity =
+                    maxCount > 0 ? totalCount / maxCount : 0;
+                  const baseColor =
+                    intensity === 0
+                      ? "bg-zinc-50 text-zinc-400 border-zinc-200"
+                      : intensity > 0.66
+                        ? "bg-emerald-600 text-white border-emerald-700"
+                        : "bg-emerald-200 text-emerald-900 border-emerald-300";
+
+                  if (!cell.inRange) {
+                    return (
+                      <div
+                        key={dateKey}
+                        className="h-12 rounded-md border border-dashed border-zinc-100 bg-zinc-50/40"
+                      />
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={dateKey}
+                      className={`h-12 rounded-md border text-xs flex flex-col items-center justify-center ${baseColor} ${
+                        everyoneAvailable ? "ring-2 ring-sky-500" : ""
+                      }`}
+                      title={
+                        totalCount === 0
+                          ? "No one available"
+                          : `${totalCount} available`
+                      }
+                    >
+                      <span className="text-sm font-medium">
+                        {format(cell.date, "d")}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </main>

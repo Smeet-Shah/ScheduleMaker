@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import {
+  addDays,
+  endOfMonth,
+  format,
+  isSameDay,
+  startOfMonth,
+  startOfWeek,
+} from "date-fns";
 
 type Slot = { start: string; end: string };
 
@@ -30,6 +38,50 @@ export default function EventPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  // For day-only events, build a calendar view data structure
+  const calendarMonths = useMemo(() => {
+    if (!data || !data.config.dayOnly) return [];
+    const start = new Date(data.config.startDate);
+    const end = new Date(data.config.endDate);
+
+    const months: {
+      monthLabel: string;
+      weeks: { date: Date; inRange: boolean; hasSlot: boolean }[][];
+    }[] = [];
+
+    let monthCursor = startOfMonth(start);
+    while (monthCursor <= end) {
+      const monthStart = startOfMonth(monthCursor);
+      const monthEnd = endOfMonth(monthCursor);
+      const firstDay = startOfWeek(monthStart, { weekStartsOn: 0 });
+
+      const weeks: { date: Date; inRange: boolean; hasSlot: boolean }[][] = [];
+      let current = firstDay;
+      // build 6 weeks max for the month grid
+      for (let w = 0; w < 6; w++) {
+        const week: { date: Date; inRange: boolean; hasSlot: boolean }[] = [];
+        for (let d = 0; d < 7; d++) {
+          const inRange = current >= start && current <= end;
+          const hasSlot = data.slots.some((slot) =>
+            isSameDay(new Date(slot.start), current),
+          );
+          week.push({ date: current, inRange, hasSlot });
+          current = addDays(current, 1);
+        }
+        weeks.push(week);
+        if (current > monthEnd && current > end) break;
+      }
+
+      months.push({
+        monthLabel: format(monthStart, "MMMM yyyy"),
+        weeks,
+      });
+      monthCursor = addDays(monthEnd, 1);
+    }
+
+    return months;
+  }, [data]);
 
   useEffect(() => {
     async function fetchEvent() {
@@ -170,52 +222,68 @@ export default function EventPage() {
               </label>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-zinc-200">
-              <div className="min-w-[640px] divide-y divide-zinc-100">
-                {Object.entries(groupedSlots).map(([dateLabel, slots]) => (
-                  <div key={dateLabel} className="px-4 py-3 space-y-2">
-                    <div className="text-sm font-medium text-zinc-800">
-                      {dateLabel}
+            {data.config.dayOnly ? (
+              <div className="space-y-6">
+                {calendarMonths.map((month) => (
+                  <div key={month.monthLabel} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-semibold text-zinc-800">
+                        {month.monthLabel}
+                      </h2>
+                      <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                        <span className="inline-flex h-3 w-3 rounded-sm border border-zinc-300 bg-white" />{" "}
+                        Not selected
+                        <span className="inline-flex h-3 w-3 rounded-sm border border-emerald-500 bg-emerald-500 ml-3" />{" "}
+                        Selected
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {slots.map((slot) => {
-                        const key = `${slot.start}-${slot.end}`;
-                        const d = new Date(slot.start);
-                        const isSelected = selected.has(key);
-                        const label = data.config.dayOnly
-                          ? d.toLocaleDateString(undefined, {
-                              weekday: "short",
-                            })
-                          : d.toLocaleTimeString(undefined, {
-                              hour: "numeric",
-                              minute: "2-digit",
-                              timeZone: timezone,
-                            });
-                        const title = data.config.dayOnly
-                          ? d.toLocaleDateString(undefined, {
-                              weekday: "long",
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })
-                          : new Date(slot.start).toLocaleString(undefined, {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                              timeZone: timezone,
-                            });
+                    <div className="grid grid-cols-7 text-[11px] text-zinc-500 mb-1">
+                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                        (day) => (
+                          <div key={day} className="text-center">
+                            {day}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1 text-xs">
+                      {month.weeks.flat().map((cell) => {
+                        const dateKey = format(cell.date, "yyyy-MM-dd");
+                        const key = data.slots.find((slot) =>
+                          isSameDay(new Date(slot.start), cell.date),
+                        );
+                        const selectionKey = key
+                          ? `${key.start}-${key.end}`
+                          : null;
+                        const isSelected =
+                          selectionKey && selected.has(selectionKey);
+
+                        if (!cell.inRange || !cell.hasSlot) {
+                          return (
+                            <div
+                              key={dateKey}
+                              className="h-12 rounded-md border border-dashed border-zinc-100 bg-zinc-50/40"
+                            />
+                          );
+                        }
+
                         return (
                           <button
-                            key={key}
+                            key={dateKey}
                             type="button"
-                            onClick={() => toggleSlot(key)}
-                            className={`px-3 py-2 rounded-full text-xs font-medium border transition-colors ${
+                            onClick={() =>
+                              selectionKey && toggleSlot(selectionKey)
+                            }
+                            className={`h-12 rounded-md border text-xs flex flex-col items-center justify-center transition-colors ${
                               isSelected
                                 ? "bg-emerald-500 text-white border-emerald-500"
-                                : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                                : "bg-white text-zinc-800 border-zinc-200 hover:bg-zinc-50"
                             }`}
-                            title={title}
+                            title={cell.date.toDateString()}
                           >
-                            {label}
+                            <span className="text-sm font-medium">
+                              {format(cell.date, "d")}
+                            </span>
                           </button>
                         );
                       })}
@@ -223,7 +291,53 @@ export default function EventPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-zinc-200">
+                <div className="min-w-[640px] divide-y divide-zinc-100">
+                  {Object.entries(groupedSlots).map(([dateLabel, slots]) => (
+                    <div key={dateLabel} className="px-4 py-3 space-y-2">
+                      <div className="text-sm font-medium text-zinc-800">
+                        {dateLabel}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {slots.map((slot) => {
+                          const key = `${slot.start}-${slot.end}`;
+                          const d = new Date(slot.start);
+                          const isSelected = selected.has(key);
+                          const label = d.toLocaleTimeString(undefined, {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            timeZone: timezone,
+                          });
+                          const title = new Date(
+                            slot.start,
+                          ).toLocaleString(undefined, {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                            timeZone: timezone,
+                          });
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => toggleSlot(key)}
+                              className={`px-3 py-2 rounded-full text-xs font-medium border transition-colors ${
+                                isSelected
+                                  ? "bg-emerald-500 text-white border-emerald-500"
+                                  : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                              }`}
+                              title={title}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <aside className="space-y-4">
